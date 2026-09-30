@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
 
 # Root user validation:
 if [ "$(id -u)" -ne 0 ]; then
@@ -26,32 +28,34 @@ check_for_network_conn() {
   fi
 }
 
+find_package_manager() {
+  MANAGERS=("apt" "dnf" "pacman" "zypper")
+
+}
+
 update_sys() {
   local retries=3
   local counter=0
 
   echo -e "Starting the system update... \n"
 
-  until dnf -y update; do
+  until apt -y update && apt -y upgrade; do
     if [ $counter -ge $retries ]; then
       echo "Could not update the system after $retries. Aborting. $(date)" | tee -a $UPDATE_LOG
       echo "Fail to updating... Tryng again in 5 secs." | tee -a $UPDATE_LOG
       echo -e "\n"
+      return 1
     fi
 
     sleep 5
     counter=$((counter + 1))
   done
 }
-
 clean_cache_and_logs() {
-  dnf -y clean all
-  dnf -y autoremove
-
+  apt -y autoclean
   find /var/log/ -type f -name "*.log" -exec truncate -s 0 {} \;
   find /var/log -type f -name "*.log" -mtime +30 -exec rm -f {} \; #Logs 30+ days old
 }
-
 if ! check_for_network_conn; then
   echo "Something's wrong. Check your network connection. $(date)" | tee -a $UPDATE_LOG
   echo -e "\n"
@@ -68,4 +72,3 @@ clean_cache_and_logs
 
 echo -e "\n"
 echo "System updating, cache and logs cleaning: successfully! $(date)" | tee -a $UPDATE_LOG
-dnf histoy info
